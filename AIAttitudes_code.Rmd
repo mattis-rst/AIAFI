@@ -1,0 +1,3170 @@
+---
+title: "AIAttitudes_code"
+author: "Matthew Jones"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse) 
+pacman::p_load(haven, survey, car, ggplot2, ggthemes, skimr, ggthemes, ggpubr, gridExtra, tidyr, dplyr, gt, sjlabelled, RColorBrewer, polycor, corrplot, paletteer, psych, kableExtra, patchwork, GPArotation, stargazer, poLCA, reshape2)
+
+knitr::opts_chunk$set(echo = TRUE)
+options(tinytex.verbose = TRUE)
+```
+
+
+# Data wrangling
+
+1.  All value scales in this report are organized from low to high. When necessary, variables from the original data set have been reverse coded and have been labeled with an "x" (for example, the rescaled k32a is identified as k32ax).
+
+2.  All questions and value scales have been translated to English from the original Finnish language with assistance from "Google Translate". Where the software translation was unclear or imprecise, consultations with native Finnish speakers were employed to ensure clarity and meaning.
+
+```{r Data Import, include=FALSE}
+# Import data to dataframe
+daF3994_fin <- read_sav("./Data/daF3994_fin.sav")
+```
+
+```{r Data wrangling1, include=FALSE}
+# Select study variables
+AiR_base <- subset(daF3994_fin, select= c(fsd_id, k1, ika, k3, k4, k70, nuts2, k23, k32a, k32b, k32c, k32d, k34a, k34b, k46, k47, k48a, k48b, k57, k62, k58a, k58b, k58c, k58d, k58e, otospaino, analyysipaino))
+
+skim(AiR_base)
+```
+
+```{r Data wrangling2 reorder low to high, include=FALSE}
+# Reorder categorical variables from low to high
+AiR_base$k23x <- 8 - AiR_base$k23
+AiR_base$k32ax <- 6 - AiR_base$k32a
+AiR_base$k32bx <- 6 - AiR_base$k32b
+AiR_base$k32cx <- 6 - AiR_base$k32c
+AiR_base$k32dx <- 6 - AiR_base$k32d
+AiR_base$k34ax <- 6 - AiR_base$k34a
+AiR_base$k34bx <- 6 - AiR_base$k34b
+AiR_base$k57x <- 6 - AiR_base$k57
+
+```
+
+```{r Data wrangling3 label variables, include=FALSE}
+# Add labels to study variables
+AiR_base$fsd_id <- set_label(AiR_base$fsd_id, label = "Observation ID")
+AiR_base$k1 <- set_label(AiR_base$k1, label = "Gender")
+AiR_base$ika <- set_label(AiR_base$ika, label = "Age")
+AiR_base$k3 <- set_label(AiR_base$k3, label = "Education (years)")
+AiR_base$k4 <- set_label(AiR_base$k4, label = "Education level")
+AiR_base$k70 <- set_label(AiR_base$k70, label = "Marital Status")
+AiR_base$nuts2 <- set_label(AiR_base$nuts2, label = "Region")
+AiR_base$k23x <- set_label(AiR_base$k23x, label = "Internet use (level)")
+AiR_base$k32ax <- set_label(AiR_base$k32ax, label = "Ability level: Using internet")
+AiR_base$k32bx <- set_label(AiR_base$k32bx, label = "Ability level: Searching online")
+AiR_base$k32cx <- set_label(AiR_base$k32cx, label = "Ability level: Online privacy")
+AiR_base$k32dx <- set_label(AiR_base$k32dx, label = "Ability level: Learning new software")
+AiR_base$k34ax <- set_label(AiR_base$k34ax, label = "It is more comfortable meeting online")
+AiR_base$k34bx <- set_label(AiR_base$k34bx, label = "Without internet, I would feel lonely")
+AiR_base$k46 <- set_label(AiR_base$k46, label = "Political leaning")
+AiR_base$k47 <- set_label(AiR_base$k47, label = "Trust level: People in general")
+AiR_base$k48a <- set_label(AiR_base$k48a, label = "Trust level: Finnish parliament")
+AiR_base$k48b <- set_label(AiR_base$k48b, label = "Trust level: Finnish courts")
+AiR_base$k62 <- set_label(AiR_base$k62, label = "Social level: Self-assessed")
+AiR_base$k57x <- set_label(AiR_base$k57x, label = "Worry that AI/Computer/Machine will take jobs")
+AiR_base$k58a <- set_label(AiR_base$k58a, label = "Comfort level: AI in medical procedure")
+AiR_base$k58b <- set_label(AiR_base$k58b, label = "Comfort level: AI self-driving cars")
+AiR_base$k58c <- set_label(AiR_base$k58c, label = "Comfort level: Human/AI uncertainty")
+AiR_base$k58d <- set_label(AiR_base$k58d, label = "Comfort level: Communication with AI")
+AiR_base$k58e <- set_label(AiR_base$k58e, label = "Comfort level: Reliability of AI information")
+AiR_base$otospaino <- set_label(AiR_base$otospaino, label = "Sample weight")
+AiR_base$analyysipaino <- set_label(AiR_base$analyysipaino, label = "Analysis weight")
+
+```
+
+```{r Data wrangling4 build study set, include=FALSE}
+# Build a study set that includes dbl and factor columns
+AiR_num <- subset(AiR_base, select= c(fsd_id, k1, ika, k3, k4, k70, nuts2, k23x, k32ax, k32bx, k32cx, k32dx, k34ax, k34bx, k46, k47, k48a, k48b, k57x, k62, k58a, k58b, k58c, k58d, k58e, otospaino, analyysipaino))
+
+# Specify the variables to convert
+vars_to_convert <- c("k1", "k4", "k70", "nuts2", "k23x", "k32ax", 
+                     "k32bx", "k32cx", "k32dx", "k34ax", "k34bx", 
+                     "k46", "k47", "k48a", "k48b", "k57x", "k62", 
+                     "k58a", "k58b", "k58c", "k58d", "k58e")
+
+# Mutate the specified variables into factors
+AiR_cat <- AiR_num %>%
+  mutate(across(all_of(vars_to_convert), as.factor))
+
+
+# Apply labels to factor variables
+AiR_cat$k1 <- set_label(AiR_cat$k1, label = "Gender")
+AiR_cat$k4 <- set_label(AiR_cat$k4, label = "Education level")
+AiR_cat$k70 <- set_label(AiR_cat$k70, label = "Marital Status")
+AiR_cat$nuts2 <- set_label(AiR_cat$nuts2, label = "Region")
+AiR_cat$k23x <- set_label(AiR_cat$k23x, label = "Internet use (level)")
+AiR_cat$k32ax <- set_label(AiR_cat$k32ax, label = "Ability level: Using internet")
+AiR_cat$k32bx <- set_label(AiR_cat$k32bx, label = "Ability level: Searching online")
+AiR_cat$k32cx <- set_label(AiR_cat$k32cx, label = "Ability level: Online privacy")
+AiR_cat$k32dx <- set_label(AiR_cat$k32dx, label = "Ability level: Learning new software")
+AiR_cat$k34ax <- set_label(AiR_cat$k34ax, label = "It is more comfortable meeting online")
+AiR_cat$k34bx <- set_label(AiR_cat$k34bx, label = "Without internet, I would feel lonely")
+AiR_cat$k46 <- set_label(AiR_cat$k46, label = "Political leaning")
+AiR_cat$k47 <- set_label(AiR_cat$k47, label = "Trust level: People in general")
+AiR_cat$k48a <- set_label(AiR_cat$k48a, label = "Trust level: Finnish parliament")
+AiR_cat$k48b <- set_label(AiR_cat$k48b, label = "Trust level: Finnish courts")
+AiR_cat$k62 <- set_label(AiR_cat$k62, label = "Social level: Self-assessed")
+AiR_cat$k57x <- set_label(AiR_cat$k57x, label = "Worry that AI will take jobs")
+AiR_cat$k58a <- set_label(AiR_cat$k58a, label = "Comfort level: AI in medical procedure")
+AiR_cat$k58b <- set_label(AiR_cat$k58b, label = "Comfort level: AI self-driving cars")
+AiR_cat$k58c <- set_label(AiR_cat$k58c, label = "Comfort level: Human/AI uncertainty")
+AiR_cat$k58d <- set_label(AiR_cat$k58d, label = "Comfort level: Communication with AI")
+AiR_cat$k58e <- set_label(AiR_cat$k58e, label = "Comfort level: Reliability of AI information")
+
+# Append a factor identifier to var names
+AiR_fac <- AiR_cat %>%
+  rename_with(~ paste0(.x, "_f"), everything())
+
+# Build new dataframe with numeric and factor copies of vars
+AiR <- cbind(AiR_num, AiR_fac)
+
+```
+
+```{r Data wrangling5 value label vectors, include=FALSE}
+# Vector for gender
+gen3lik <- c(
+  `1` = "Male",
+  `2` = "Female",
+  `3` = "Prefer not to say"
+  ) 
+
+# Vector for education
+edu13lik <- c(
+  `0` = "Haven't gone to school",
+  `1` =	"Still in comprehensive school",
+  `2` = "Elementary school or civic school",
+  `3` = "Comprehensive school",
+  `4` = "Trade school or course",
+  `5` = "High school or matriculation examination",
+  `6` = "Specialist Vocational Qualification",
+  `7` = "Post-secondary vocational education",
+  `8` = "Bachelor's degree",
+  `9` = "Master's Degree",
+  `10` = "University, bachelor's degree",
+  `11` = "University, master's degree",
+  `12` = "Licentiate or doctoral degree"
+  ) 
+
+
+# Vector for marital status
+mar6lik <- c(
+  `1` =	"Married",
+  `2` =	"In a registered partnership",
+  `3` =	"Separated (in a registered partnership)",
+  `4` =	"Divorced from registered partnership",
+  `5` =	"Widow after registered partnership",
+  `6` =	"Single"
+  )
+
+# vector for region
+reg5lik <- c(
+  `1` =	"FI19 Western Finland",
+  `2` =	"FI1B Helsinki-Uusimaa",
+  `3` =	"FI1C Southern Finland",
+  `4` =	"FI1D Northern and Eastern Finland",
+  `5` =	"FI20 Åland Islands"
+  )
+
+freq7lik <- c(
+  `1` = "Never",
+  `2` = "Less often",
+  `3` = "Several times a month",
+  `4` = "Several times a week",
+  `5` = "Once a day",
+  `6` = "Several times a day",
+  `7` = "All the time"
+  ) 
+
+# Vector for ability level
+abil5lik <- c(
+  `1` = "Very bad",
+  `2` = "Bad",
+  `3` = "Moderate",
+  `4` = "Good",
+  `5` = "Very good"
+  ) 
+
+
+agr5lik <- c(
+  `1` = "Completely disagree",
+  `2` = "Disagree",
+  `3` = "Neither",
+  `4` = "Agree",
+  `5` = "Totally agree"
+  ) 
+
+#Vector for politics scale
+pol11scal <- c(
+  `0` = "0 (Left wing)",
+  `1` =	"1",
+  `2` = "2",
+  `3` = "3",
+  `4` = "4",
+  `5` = "5 (Center)",
+  `6` = "6",
+  `7` = "7",
+  `8` = "8",
+  `9` = "9",
+  `10` = "10 (Right wing)"
+  ) 
+
+#Vector for trust scale
+trust11scal <- c(
+  `0` = "0 (Completely distrust)",
+  `1` =	"1",
+  `2` = "2",
+  `3` = "3",
+  `4` = "4",
+  `5` = "5",
+  `6` = "6",
+  `7` = "7",
+  `8` = "8",
+  `9` = "9",
+  `10` = "10 (Trust completely)"
+  ) 
+
+# Vector for worry level
+worry5lik <- c(
+  `1` = "Not at all",
+  `2` = "Not really",
+  `3` = "A little",
+  `4` = "Moderately",
+  `5` = "Very"
+  ) 
+
+comf11scal <- c(
+  `0` = "0 (Completely uncomfortable)",
+  `1` =	"1",
+  `2` = "2",
+  `3` = "3",
+  `4` = "4",
+  `5` = "5",
+  `6` = "6",
+  `7` = "7",
+  `8` = "8",
+  `9` = "9",
+  `10` = "10 (Completely comfortable)"
+  )
+```
+
+```{r Data wrangling6 apply value labels, include=FALSE}
+
+#Label factor values
+AiR$k1_f <- set_labels(AiR$k1_f, labels = gen3lik)
+AiR$k4_f <- set_labels(AiR$k4_f, labels = edu13lik)
+AiR$k70_f <- set_labels(AiR$k70_f, labels = mar6lik)
+AiR$nuts2_f <- set_labels(AiR$nuts2_f, labels = reg5lik)
+AiR$k23x_f <- set_labels(AiR$k23x_f, labels = freq7lik)
+AiR$k32ax_f <- set_labels(AiR$k32ax_f, labels = abil5lik)
+AiR$k32bx_f <- set_labels(AiR$k32bx_f, labels = abil5lik)
+AiR$k32cx_f <- set_labels(AiR$k32cx_f, labels = abil5lik)
+AiR$k32dx_f <- set_labels(AiR$k32dx_f, labels = abil5lik)
+AiR$k34ax_f <- set_labels(AiR$k34ax_f, labels = agr5lik)
+AiR$k34bx_f <- set_labels(AiR$k34bx_f, labels = agr5lik)
+AiR$k46_f <- set_labels(AiR$k46_f, labels = pol11scal)
+AiR$k47_f <- set_labels(AiR$k47_f, labels = trust11scal)
+AiR$k48a_f <- set_labels(AiR$k48a_f, labels = trust11scal)
+AiR$k48b_f <- set_labels(AiR$k48b_f, labels = trust11scal)
+AiR$k57x_f <- set_labels(AiR$k57x_f, labels = worry5lik)
+AiR$k58a_f <- set_labels(AiR$k58a_f, labels = comf11scal)
+AiR$k58b_f <- set_labels(AiR$k58b_f, labels = comf11scal)
+AiR$k58c_f <- set_labels(AiR$k58c_f, labels = comf11scal)
+AiR$k58d_f <- set_labels(AiR$k58d_f, labels = comf11scal)
+AiR$k58e_f <- set_labels(AiR$k58e_f, labels = comf11scal)
+
+```
+
+
+# Outcome variables
+
+```{r attitude plots,  fig.cap = "Distribution of attitudinal indictators", fig.height=6, echo=FALSE}
+# k58a plot
+k58a_plot <- ggplot(AiR, aes(x = k58a_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k58b plot
+k58b_plot <- ggplot(AiR, aes(x = k58b_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k58c plot
+k58c_plot <- ggplot(AiR, aes(x = k58c_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k58d plot
+k58d_plot <- ggplot(AiR, aes(x = k58d_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k58e plot
+k58e_plot <- ggplot(AiR, aes(x = k58e_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+
+
+attitude_plot <- wrap_plots(
+  k58a_plot, k58b_plot, 
+  k58c_plot, k58d_plot, 
+  k58e_plot, 
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+attitude_plot + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+## Test for evidence of straight-lining
+
+```{r Staightlining sorting variable, include=FALSE}
+
+#Create indicator variable to report cases of all ones across AI indicators
+AiR <- AiR %>% mutate(all1 = ifelse(k58a * k58b * k58c * k58d * k58e == 1, 1, 0)
+                                  , all1 = as.factor(all1))
+#Check variable count
+summary(AiR$all1)
+
+#Create subset for potential straight-liners
+AiRstr <- AiR %>% subset(all1==1)
+```
+
+
+```{r Ind str test,  fig.cap = "Straight-line check across other indicators", fig.height=6, echo=FALSE}
+# k32a plot
+k32a_plot_s <- ggplot(AiRstr, aes(x = k32ax_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count",
+       x = get_label(AiR$k32ax_f)) +
+  theme_pubr()
+# k32b plot
+k32b_plot_s <- ggplot(AiRstr, aes(x = k32bx_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count",
+       x = get_label(AiR$k32bx_f)) +
+  theme_pubr()
+# k32c plot
+k32c_plot_s <- ggplot(AiRstr, aes(x = k32cx_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count",
+       x = get_label(AiR$k32cx_f)) +
+  theme_pubr()
+# k32d plot
+k32d_plot_s <- ggplot(AiRstr, aes(x = k32dx_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count",
+       x = get_label(AiR$k32dx_f)) +
+  theme_pubr()
+k48a_plot_s <- ggplot(AiRstr, aes(x = k48a_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count",
+       x = get_label(AiR$k48a_f)) +
+  theme_pubr()
+k57x_plot_s <- ggplot(AiRstr, aes(x = k57x_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count",
+       x = get_label(AiR$k57x_f)) +
+  theme_pubr()
+
+digeff_plot <- wrap_plots(
+  k32a_plot_s, k32b_plot_s, 
+  k32c_plot_s, k32d_plot_s,
+  k48a_plot_s, k57x_plot_s,
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+digeff_plot + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+## Missingness analysis
+
+```{r MCAR test variables 1, include=FALSE}
+
+AiR_ind <- subset(AiR, select= c(k1, ika, k3, k4, k32ax, k32bx, k32cx, k32dx, k48a, k57x, k58a, k58b, k58c, k58d, k58e))
+
+na_counts <- sapply(AiR_ind[, c("k32ax", "k32bx", "k32cx", "k32dx", "k58a", "k58b", "k58c", "k58d", "k58e")], function(x) sum(is.na(x)))
+print(na_counts)
+
+AiR_test <- AiR %>% filter(if_all(c(k32ax, k32bx, k32cx, k32dx, k58a, k58b, k58c, k58d, k58e), ~ !is.na(.)))
+missing_data <- AiR_ind %>%
+  filter(is.na(k32ax) | is.na(k32bx) | is.na(k32cx) | is.na(k32dx) | is.na(k58a) | is.na(k58b) | is.na(k58c) | is.na(k58d) | is.na(k58e))
+```
+
+```{r MCAR test 1, include=FALSE}
+library(dplyr)
+
+indicators <- c("k1", "ika", "k3", "k4", "k32ax", "k32bx", "k32cx", "k32dx", "k48a", "k57x", "k58a", "k58b", "k58c", "k58d", "k58e")
+
+# Function to compare distribution in NA set to complete set
+compare_distributions <- function(complete_data, subset_data, indicators) {
+  results_df <- data.frame(Test_Variable = character(),
+                            Statistic = numeric(),
+                            P_value = numeric(),
+                            stringsAsFactors = FALSE)  # Create an empty data frame for results
+
+  for (indicator in indicators) {
+    # Check if the indicator exists in both datasets
+    if (indicator %in% colnames(complete_data) && indicator %in% colnames(subset_data)) {
+      # Perform the Mann-Whitney U Test
+      test_result <- wilcox.test(complete_data[[indicator]], subset_data[[indicator]], alternative = "two.sided")
+      
+      # Append the results to the data frame
+      results_df <- rbind(results_df, data.frame(Indicator = indicator,
+                                                  Statistic = test_result$statistic,
+                                                  P_value = test_result$p.value,
+                                                  stringsAsFactors = FALSE))
+      
+      # Print the results
+      cat("Mann-Whitney U Test for", indicator, ":\n")
+      cat("  Statistic:", test_result$statistic, "\n")
+      cat("  P-value:", test_result$p.value, "\n\n")
+    } else {
+      cat("Indicator", indicator, "not found in one of the datasets.\n\n")
+    }
+  }
+  
+  return(results_df)  # Return the results data frame
+}
+
+# Call the function and store results in a variable
+results_table <- compare_distributions(AiR_ind, AiR_test, indicators)
+
+```
+
+```{r MCAR table results, tab.cap="Mann-Whitney test for significance of removed observations", echo=FALSE}
+
+wilcox_table <- results_table %>%
+  gt() %>%
+  tab_header(
+    title = "Results of Mann-Whitney U Test"
+  ) %>%
+  cols_label(
+    Indicator = "Test Variable",
+    Statistic = "Statistic",
+    P_value = "P-value"
+  ) %>%
+  fmt_number(
+    columns = c(Statistic, P_value),
+    decimals = 2
+  )
+wilcox_table
+```
+
+Using the Mann-Whitney U test, the distributions of all indicator variables in the "clean" data set were compared to the original. For each variable, the test did not reveal significant cause to dismiss the null hypothesis that the distributions are from the same sample. Together, these results suggest that the missing data is likely missing completely at random (MCAR) and can be safely removed without skewing the results.
+
+```{r Filter complete case analysis, include=FALSE}
+AiR_clean <- AiR %>%
+  filter(if_all(c(k32ax, k32bx, k32cx, k32dx, k58a, k58b, k58c, k58d, k58e), ~ !is.na(.)))
+```
+
+\clearpage
+
+# Predictor variables
+
+## Digital technology efficacy
+
+```{r digital eff plots,  fig.cap = "Distribution of digital efficacy indicators", fig.height=6, echo=FALSE}
+# k32a plot
+k32a_plot <- ggplot(AiR_clean, aes(x = k32ax_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(labels = get_labels(AiR_clean$k32ax_f))+
+  theme_pubr()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+# k32b plot
+k32b_plot <- ggplot(AiR_clean, aes(x = k32bx_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(labels = get_labels(AiR_clean$k32ax_f))+
+  theme_pubr()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+# k32c plot
+k32c_plot <- ggplot(AiR_clean, aes(x = k32cx_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(labels = get_labels(AiR_clean$k32ax_f))+
+  theme_pubr()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+# k32d plot
+k32d_plot <- ggplot(AiR_clean, aes(x = k32dx_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(labels = get_labels(AiR_clean$k32ax_f))+
+  theme_pubr()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+
+
+digeff_plot <- wrap_plots(
+  k32a_plot, k32b_plot, 
+  k32c_plot, k32d_plot, 
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+digeff_plot + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+
+## Institutional trust
+
+```{r Inst trust,  fig.cap = "Distribution of institutional trust indicator", echo=FALSE}
+# k48a plot
+ggplot(AiR_clean, aes(x = k48a_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count",
+       caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data") +
+  theme_pubr()
+
+```
+
+
+
+## Perceived personal threat of job loss
+
+```{r Personal threat,  fig.cap = "Distribution of personal threat indicator", echo=FALSE}
+# k57 plot
+ggplot(AiR_clean, aes(x = k57x_f)) +
+  geom_bar(fill="steelblue", color="black", alpha = 0.7) +
+  labs(y = "Count",
+       caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data") +
+  scale_x_discrete(labels = get_labels(AiR_clean$k57x_f))+
+  theme_pubr()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+
+
+```
+
+**Indicator:**
+
+[k57] How concerned are you in general that in the next 10 years, machines, computer programs, and artificial intelligence will take over many of the jobs that people do?
+
+\clearpage
+
+# Demographics
+
+## Gender
+
+```{r k1 plot,  fig.cap = "Distribution of gender", echo=FALSE}
+gender_counts <- table(AiR_clean$k1)  
+# convert to percentages
+gender_percentages <- prop.table(gender_counts) * 100  
+
+# create a data frame 
+gender_df <- data.frame(
+  Gender = names(gender_counts), 
+  count = as.vector(gender_counts),  
+  percentage = round(gender_percentages, 1)  
+)
+
+gender_df$Gender <- set_labels(gender_df$Gender, labels = gen3lik)
+
+ggplot(gender_df, aes(x = Gender, y = count, fill=Gender)) +
+  geom_bar(stat = "identity", alpha = 0.7, color = "black") +
+  coord_flip() + 
+  labs(y = "Count",
+       caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data") +
+  scale_x_discrete(labels = get_labels(AiR_clean$k1_f))+
+  geom_text(aes(label = paste0(percentage.Freq, "%")), 
+            hjust = - 0.2, 
+            color = "black") +
+  scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +
+  theme_pubr()+
+  theme(legend.position = "none")+
+  scale_y_continuous(limits = c(0, 800))
+```
+
+## Age
+
+```{r ika stats, include=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika <- AiR_clean %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+```
+
+```{r ika stat table, tab.cap="Summary statistics for age variable 'ika'", echo=FALSE}
+
+ika_table <- summary_ika %>%
+  gt() %>%
+  tab_header(
+    title = "Age Distribution Summary"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table
+```
+
+```{r ika plot,  fig.cap = "Distribution of age by 5-year bracket", echo=FALSE}
+# plot for the variable "ika"
+ggplot(AiR_clean, aes(x = ika, fill=k1_f)) +
+  geom_histogram(binwidth = 5,color="black", alpha = 0.7) +
+  labs(title = "Histogram of age distribution",
+       y = "Count",
+       caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3), 
+                    labels = get_labels(AiR_clean$k1_f)) +  # Use factor labels for k1
+  theme_pubr()
+
+```
+
+## Education level
+
+```{r k4 plot,  fig.cap = "Distribution of education level", echo=FALSE}
+# plot for the variable k4
+ggplot(AiR_clean, aes(x = k4_f, fill=k1_f)) +
+  geom_bar(color="black", alpha = 0.7) +
+  labs(title = "Bar plot of education level by gender",
+       y = "Count",
+       caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data") +
+    scale_x_discrete(labels = get_labels(AiR_clean$k4_f))+
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3), 
+                    labels = get_labels(AiR_clean$k1_f)) + 
+    theme_pubr()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=7))
+
+
+```
+
+
+
+
+# Exploratory factor analysis
+
+## EFA 1: Comfort with AI
+
+```{r AI comfort corr full, echo=FALSE}
+# Select the variables of interest
+
+EFAAI <- subset(AiR_clean, select= c(k58a,k58b,k58c,k58d,k58e))
+
+EFAAI <- EFAAI%>% rename(Medical = k58a,
+                         Driving = k58b, 
+                         Uncertainty = k58c,
+                         Interaction = k58d,
+                         Reliability = k58e)
+
+
+# Calculate the correlation matrix
+AI_mat <- cor(EFAAI, method = "spearman")
+
+
+# plot the matrix
+corrplot(AI_mat, method = "color", 
+         type = "full",  
+         order = "original", 
+         tl.col = "black",
+         tl.cex = .8,
+         diag = TRUE,
+         addgrid.col = "cadetblue",
+         addrect = 1,
+         number.font = 1,
+         tl.srt = 45,
+         addCoef.col = "white",  
+         number.cex = 1,      
+         title = "Correlation matrix of AI comfort", 
+         mar=c(0,0,2,0))         
+
+```
+
+```{r AIR KMO, include=FALSE}
+# Digital literacy KMO test
+
+KMO_EFAAI <- KMO(EFAAI)
+print(KMO_EFAAI)
+
+```
+
+```{r AIR Bartlett, include=FALSE}
+
+# Correlation matrix non-parametric monotonic ordinal factor
+corr_mat_aiefa <- cor(EFAAI, method = "spearman")
+
+
+# Bartlett test
+bartlett_ai <- cortest.bartlett(corr_mat_aiefa, n = nrow(EFAAI))
+print(bartlett_ai)
+
+```
+
+```{r AIR parallel analysis all, fig.cap = "Parallel analysis test for AI Comfort (full sample)", echo=FALSE}
+
+# Parallel analysis test for number of factors
+fa.parallel(EFAAI,
+            fa = "fa",
+            fm ="uls",
+            main="",
+            n.iter = 10,
+            correct=.5, 
+            sqrt=TRUE)
+
+```
+
+```{r AIR full EFA, include=FALSE}
+
+EFAAI <- subset(AiR_clean, select= c(k58a,k58b,k58c,k58d,k58e))
+
+
+fa_ai <- fa(EFAAI, 
+              nfactors = 2, 
+              rotate = "Promax",
+              cor = "spearman",
+              fm ="uls", 
+              scores = "regression")
+print(fa_ai)
+```
+
+```{r AI EFA diag, fig.cap = "AI comfort factor structure (full sample)", echo=FALSE}
+# Factor loading diagram digital literacy
+colnames(fa_ai$loadings) <- c("A1", "A2")
+fa.diagram(fa_ai, 
+           marg=c(1,1,1,1),
+           main="",
+           l.cex = 0.8,
+           e.size = .1,
+           cut = 0.3)
+
+```
+
+```{r AI Factor loadings variable, include=FALSE}
+# AI Factor loading variable
+fact_score_ai <- as.data.frame(fa_ai$scores)
+fact_score_ai <- fact_score_ai %>% rename(A1 = ULS1)
+fact_score_ai <- fact_score_ai %>% rename(A2 = ULS2)
+fact_score_ai$AR1 <- set_label(fact_score_ai$AR1, label = "A1: AI Comfort (Communication)")
+fact_score_ai$AR2 <- set_label(fact_score_ai$AR2, label = "A2: AI Comfort (Automation)")
+
+```
+
+```{r EFA A1 A2 loadings, fig.cap = "Digital Efficacy factor analysis loadings", echo=FALSE}
+# Extract loadings and communalities
+loadings1_ai <- fa_ai$loadings[, 1]  
+loadings2_ai <- fa_ai$loadings[, 2]  
+communalities_ai <- fa_ai$communality  
+
+# Data frame for the table
+df_ai <- data.frame(
+  Indicator = c("Medical", "Driving", "Uncertainty", "Interaction", "Reliability"),
+  Variable = rownames(fa_ai$loadings),  
+  A1 = loadings1_ai,
+  A2 = loadings2_ai,
+  Communalities = communalities_ai          
+)
+
+# gt table
+ai_table <- df_ai %>%
+  gt() %>%
+  tab_header(
+    title = "AI Comfort EFA Results",
+    subtitle = "Factor Loadings and Communalities"
+  ) %>%
+  cols_label(
+    Indicator = "Comfort Measure",
+    Variable = "Variable",
+    A1 = "A1",
+    A2 = "A2",
+    Communalities = "h² Communalities"
+  ) %>%
+  fmt_number(
+    columns = c(A1, A2, Communalities),
+    decimals = 3  
+  )
+ai_table
+
+```
+
+
+```{r AR1 AR2 plot, fig.cap = "Scatterplot demonstrating separation of factors", echo=FALSE}
+ggplot(
+  data = fact_score_ai,
+  mapping = aes(A2, y = A1)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  #geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data") +
+  theme_pubr()
+```
+
+
+## EFA 2: Online Efficacy
+
+```{r Correlation matrix, fig.cap = "Correlation of digital efficacy variables", echo=FALSE}
+library(polycor)
+
+# Select the variables of interest
+Digeff_df <- AiR_clean[, c("k32ax", "k32bx", "k32cx", "k32dx")]
+Digeff_df <- Digeff_df%>% rename(Usage = k32ax,
+                                 Search = k32bx,
+                                 Privacy = k32cx,
+                                 Learning = k32dx)
+
+
+# Calculate the polychoric correlation matrix
+polychoric_correlation_matrix <- polychoric(Digeff_df)
+
+# View the correlation matrix
+Digeff_mat <-polychoric_correlation_matrix$rho
+
+# plot the matrix
+corrplot(Digeff_mat, method = "color", 
+         type = "full",  
+         order = "original", 
+         tl.col = "black",
+         tl.cex = .8,
+         diag = TRUE,
+         addgrid.col = "cadetblue",
+         addrect = 1,
+         number.font = 1,
+         tl.srt = 45,
+         addCoef.col = "white",  
+         number.cex = 1,      
+         title = "", 
+         mar=c(0,0,2,0))         
+
+
+```
+
+
+```{r Digital efficacy check consistency., include=FALSE}
+# Cronbach’s Alpha Digital Efficacy indicators
+alpha_dl <- alpha(AiR_clean[, c("k32ax", "k32bx", "k32cx", "k32dx")])
+print(alpha_dl$total$raw_alpha)
+
+```
+
+```{r DL KMO, include=FALSE}
+# Digital literacy KMO test
+
+EFAAB <- subset(AiR_clean, select= c(k32ax,k32bx,k32cx,k32dx))
+KMO_EFAAB <- KMO(EFAAB)
+print(KMO_EFAAB)
+
+```
+
+
+```{r DL Bartlett, include=FALSE}
+
+# Bartlett test
+bartlett_ab <- cortest.bartlett(Digeff_mat, n = nrow(EFAAB))
+print(bartlett_ab)
+
+```
+
+```{r DL PA, fig.cap="Parallel analysis test for Digital Literacy factor extraction", include=FALSE}
+
+# Parallel analysis test for number of factors
+set.seed(123)
+fa.parallel(EFAAB,
+            fa = "fa",
+            main="",
+            cor = "poly",
+            n.iter = 10,
+            correct=.5, 
+            sqrt=TRUE)
+
+```
+
+
+```{r DL EFA, include=FALSE}
+
+# EFA digital literacy
+fa_dl <- fa(EFAAB, 
+              nfactors = 1, 
+              rotate = "Promax",
+              cor = "poly",
+              fm ="uls", 
+              scores = "regression")
+print(fa_dl)
+```
+
+
+```{r EFA D1 loadings, fig.cap = "Digital Efficacy factor analysis loadings", echo=FALSE}
+# Extract loadings and communalities
+loadings_d1 <- fa_dl$loadings[, 1]  
+communalities_d1 <- fa_dl$communality  
+
+# Data frame for the table
+df_d1 <- data.frame(
+  Indicator = c("Usage", "Search", "Privacy", "Learning"),
+  Variable = rownames(fa_dl$loadings),  
+  Loadings = loadings_d1,                  
+  Communalities = communalities_d1          
+)
+
+# gt table
+d1_table <- df_d1 %>%
+  gt() %>%
+  tab_header(
+    title = "Digital Efficacy (D1) EFA Results",
+    subtitle = "Factor Loadings and Communalities"
+  ) %>%
+  cols_label(
+    Indicator = "Online Skill",
+    Variable = "Variable",
+    Loadings = "ULS Loadings",
+    Communalities = "h² Communalities"
+  ) %>%
+  fmt_number(
+    columns = c(Loadings, Communalities),
+    decimals = 3  
+  )
+d1_table
+
+```
+
+```{r DL EFA diag, fig.cap = "Digital Efficacy factor analysis diagram", echo=FALSE}
+# Factor loading diagram digital literacy
+colnames(fa_dl$loadings) <- c("D1")
+fa.diagram(fa_dl, 
+           marg=c(1,1,1,1),
+           main="",
+           l.cex = 0.8,
+           e.size = .1,
+           cut = 0)
+
+```
+
+```{r DL Factor scores variable, include=FALSE}
+# DL Factor loading variable
+fact_score_dl <- as.data.frame(fa_dl$scores)
+fact_score_dl <- fact_score_dl %>% rename(D1 = ULS1)
+fact_score_dl$D1 <- set_label(fact_score_dl$D1, label = "D1: Digital Efficacy")
+summary(fact_score_dl$D1)
+```
+
+```{r merge factor scores to DF, include=FALSE}
+# Add extracted factors to data frame
+
+AiRf <- cbind(AiR_clean, fact_score_dl, fact_score_ai)
+
+```
+
+
+# Latent Class Analysis
+
+**Note:** Latent class are renumbered to maintain consistent alignment of distinct class profiles throughout the report. The ordering was a subjective choice.
+
+```{r LCA class count selection, echo=FALSE}
+# Select variables for class analysis
+LCAAi <- subset(AiRf, select= c(k58a_f,k58b_f,k58c_f,k58d_f,k58e_f))
+# set seed to reproduce results
+set.seed(123)
+# Define the formula for LCA
+lca_ai_formula <- cbind(k58a_f, k58b_f, k58c_f, k58d_f, k58e_f) ~ 1  # No covariates
+
+# Loop through different numbers of classes to evaluate fit
+results_ai <- list()
+for (n in 1:8) {
+    results_ai[[n]] <- poLCA(lca_ai_formula, LCAAi, nclass = n, maxiter = 1000, na.rm = FALSE)
+}
+```
+
+```{r AI LCA BIC AIC plot,  fig.cap = "BIC value plot", echo=FALSE}
+# Extract BIC/AIC values
+bic_values <- sapply(results_ai, function(x) x$bic)
+aic_values <- sapply(results_ai, function(x) x$aic)
+
+# Plot BIC/AIC values
+plot(1:8, bic_values, type = "b", col = "steelblue", xlab = "Number of Classes", ylab = "BIC", main = "BIC for Different Class Models")
+points(1:8, aic_values, type = "b", col = "tomato")
+legend("topright", legend = c("BIC", "AIC"), col = c("steelblue", "tomato"), pch = 1)
+```
+
+```{r AI recep LCA Results, echo=FALSE}
+# set seed to reproduce results
+set.seed(123)
+
+# Fit the LCA model with a specified number of classes
+lca_ai_model <- poLCA(lca_ai_formula, LCAAi, nclass = 4, maxiter = 1000, na.rm = FALSE)
+
+# Manual Entropy Calculation for poLCA
+error_prior <- lca_ai_model$posterior
+n <- nrow(error_prior)
+k <- ncol(error_prior)
+
+# Calculate sum of posterior * log(posterior)
+entropy_sum <- sum(-error_prior * log(error_prior), na.rm = TRUE)
+
+# Relative Entropy formula
+entropy <- 1 - (entropy_sum / (n * log(k)))
+print(entropy)
+```
+
+```{r Summary of membership, echo=FALSE}
+class_membership <- lca_ai_model$predclass
+LCAAi$class <- class_membership
+# Summarize class characteristics
+table(LCAAi$class)
+```
+
+```{r Reorder latent classes and add to df, echo=FALSE}
+LCAAi <- LCAAi %>%
+  mutate(Class = case_when(
+    class == 1 ~ 3,
+    class == 2 ~ 1,
+    class == 3 ~ 2,
+    class == 4 ~ 4,
+    TRUE ~ NA_real_  # In case there are any unexpected values
+  ))
+
+AiRf$Class <- LCAAi$Class
+
+AiRf$Class_f <- as.factor(AiRf$Class)
+AiRf$Class_f <- set_label(AiRf$Class_f, label = "Latent Class")
+latclass4 <- c(
+  `1` = "Adopters",
+  `2` = "Cautious",
+  `3` = "Resisters",
+  `4` = "Rejecters"
+  ) 
+AiRf$Class_f <- set_labels(AiRf$Class_f, labels = latclass4)
+
+```
+
+```{r AI LCA analysis matrix, echo=FALSE, fig.cap="Classification table comparing LCA predicted vs. posterior probabilities"}
+# Identify class with the highest posterior probability for each obs.
+pred_class <- lca_ai_model$predclass
+
+# compare predicted membership against the sum of posterior probabilities.
+posterior_probs <- lca_ai_model$posterior
+
+# Create the analysis matrix 
+confusion_mat <- round(t(posterior_probs) %*% model.matrix(~ as.factor(pred_class) - 1), 2)
+colnames(confusion_mat) <- paste(1:ncol(confusion_mat))
+rownames(confusion_mat) <- paste(1:nrow(confusion_mat))
+
+# Convert the confusion_mat to a data frame
+conf_df <- melt(confusion_mat)
+
+# Rename columns for clarity 
+colnames(conf_df) <- c("Probabilistic_Class", "Assigned_Class", "Frequency")
+
+# Renumber to align with report numbering
+conf_df <- conf_df %>%
+  mutate(Probabilistic = case_when(
+    Probabilistic_Class == 1 ~ "Class 3",
+    Probabilistic_Class == 2 ~ "Class 1",
+    Probabilistic_Class == 3 ~ "Class 2",
+    Probabilistic_Class == 4 ~ "Class 4"),
+    Assigned = case_when(
+    Assigned_Class == 1 ~ "Class 3",
+    Assigned_Class == 2 ~ "Class 1",
+    Assigned_Class == 3 ~ "Class 2",
+    Assigned_Class == 4 ~ "Class 4"))
+
+# Plot the categorization table (confusion matrix)
+library(forcats)
+ggplot(conf_df, aes(x = Assigned, y = fct_rev(Probabilistic), fill = Frequency)) +
+  geom_tile(color = "white") + 
+  geom_text(aes(label = Frequency), color = "black", size = 4) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(title = "Classification Diagnostic Matrix",
+       x = "Assigned Class",
+       y = "Probabilistic (Expected) Class",
+       fill = "Frequency",
+       caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data") +
+  coord_fixed()+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8),
+        axis.text.y = element_text(size=8), 
+        legend.position = "none")
+
+```
+
+
+```{r Separate by class structures, include=FALSE}
+library(dplyr)
+
+Adopters <- AiRf %>% filter(Class == 1)
+Cautious <- AiRf %>% filter(Class == 2)
+Resisters <- AiRf %>% filter(Class == 3)
+Rejecters <- AiRf %>% filter(Class == 4)
+
+```
+
+# Class Analysis
+
+## Class 1: "Adopters"
+
+```{r class 1 ai attitudes,  fig.cap = "Class 1 AI receptivity indicator distributions", fig.height=6, echo=FALSE}
+# k58a plot
+k58a_plot1 <- ggplot(Adopters, aes(x = k58a_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58b plot
+k58b_plot1 <- ggplot(Adopters, aes(x = k58b_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58c plot
+k58c_plot1 <- ggplot(Adopters, aes(x = k58c_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58d plot
+k58d_plot1 <- ggplot(Adopters, aes(x = k58d_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58e plot
+k58e_plot1 <- ggplot(Adopters, aes(x = k58e_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+
+
+attitude_plot <- wrap_plots(
+  k58a_plot1, k58b_plot1, 
+  k58c_plot1, k58d_plot1, 
+  k58e_plot1, 
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+attitude_plot + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+
+## Class 2: "Cautious"
+
+```{r class 2 ai attitudes,  fig.cap = "Class 2 AI receptivity indicator distributions", fig.height=6, echo=FALSE}
+# k58a plot
+k58a_plot2 <- ggplot(Cautious, aes(x = k58a_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58b plot
+k58b_plot2 <- ggplot(Cautious, aes(x = k58b_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58c plot
+k58c_plot2 <- ggplot(Cautious, aes(x = k58c_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58d plot
+k58d_plot2 <- ggplot(Cautious, aes(x = k58d_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58e plot
+k58e_plot2 <- ggplot(Cautious, aes(x = k58e_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+
+
+attitude_plot <- wrap_plots(
+  k58a_plot2, k58b_plot2, 
+  k58c_plot2, k58d_plot2, 
+  k58e_plot2, 
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+attitude_plot + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+
+## Class 3: "Resisters"
+
+```{r class 3 ai attitudes,  fig.cap = "Class 3 (Resisters) AI receptivity indicator distributions", fig.height=6, echo=FALSE}
+# k58a plot
+k58a_plot3 <- ggplot(Resisters, aes(x = k58a_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58b plot
+k58b_plot3 <- ggplot(Resisters, aes(x = k58b_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58c plot
+k58c_plot3 <- ggplot(Resisters, aes(x = k58c_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58d plot
+k58d_plot3 <- ggplot(Resisters, aes(x = k58d_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58e plot
+k58e_plot3 <- ggplot(Resisters, aes(x = k58e_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+
+
+attitude_plot <- wrap_plots(
+  k58a_plot3, k58b_plot3, 
+  k58c_plot3, k58d_plot3, 
+  k58e_plot3, 
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+attitude_plot + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+
+## Class 4: "Rejecters"
+
+```{r Rejecters ai attitudes,  fig.cap = "Class 4 (Rejecters) AI receptivity indicator distributions", fig.height=6, echo=FALSE}
+# k58a plot
+k58a_plot4 <- ggplot(Rejecters, aes(x = k58a_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58b plot
+k58b_plot4 <- ggplot(Rejecters, aes(x = k58b_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58c plot
+k58c_plot4 <- ggplot(Rejecters, aes(x = k58c_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58d plot
+k58d_plot4 <- ggplot(Rejecters, aes(x = k58d_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+# k58e plot
+k58e_plot4 <- ggplot(Rejecters, aes(x = k58e_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  scale_x_discrete(limits = as.character(0:10)) +
+  theme_pubr()
+
+
+attitude_plot <- wrap_plots(
+  k58a_plot4, k58b_plot4, 
+  k58c_plot4, k58d_plot4, 
+  k58e_plot4, 
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+attitude_plot + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+## Expected Values
+
+```{r Expected values ai, fig.cap = "Distribution of comfort level expected values by latent class", fig.height=6, echo=FALSE}
+# Create dataframes of expected values for each class
+evi_df1 <- data.frame(Class = "Adopters",
+                     Variable = 1:5,
+                     Expected = c(mean(Adopters$k58a, na.rm = TRUE),
+                                  mean(Adopters$k58b, na.rm = TRUE),
+                                  mean(Adopters$k58c, na.rm = TRUE),
+                                  mean(Adopters$k58d, na.rm = TRUE),
+                                  mean(Adopters$k58e, na.rm = TRUE)))
+
+evi_df2 <- data.frame(Class = "Cautious",
+                     Variable = 1:5,
+                     Expected = c(mean(Cautious$k58a, na.rm = TRUE),
+                                  mean(Cautious$k58b, na.rm = TRUE),
+                                  mean(Cautious$k58c, na.rm = TRUE),
+                                  mean(Cautious$k58d, na.rm = TRUE),
+                                  mean(Cautious$k58e, na.rm = TRUE)))
+
+evi_df3 <- data.frame(Class = "Resisters",
+                     Variable = 1:5,
+                     Expected = c(mean(Resisters$k58a, na.rm = TRUE),
+                                  mean(Resisters$k58b, na.rm = TRUE),
+                                  mean(Resisters$k58c, na.rm = TRUE),
+                                  mean(Resisters$k58d, na.rm = TRUE),
+                                  mean(Resisters$k58e, na.rm = TRUE)))
+
+evi_df4 <- data.frame(Class = "Rejecters",
+                     Variable = 1:5,
+                     Expected = c(mean(Rejecters$k58a, na.rm = TRUE),
+                                  mean(Rejecters$k58b, na.rm = TRUE),
+                                  mean(Rejecters$k58c, na.rm = TRUE),
+                                  mean(Rejecters$k58d, na.rm = TRUE),
+                                  mean(Rejecters$k58e, na.rm = TRUE)))
+
+# Combine all data frames
+evi_plot <- rbind(evi_df1, evi_df2, evi_df3, evi_df4)
+
+# Define predictor variable labels
+predi_vars <- c("Medical", "Driving", "Uncertainty", "Interaction", "Reliability")
+
+# Convert Variables to factor with proper labels
+evi_plot$Variable <- factor(evi_plot$Variable, levels = 1:5, labels = predi_vars)
+evi_plot$Class <- factor(evi_plot$Class, levels = c("Adopters", "Cautious", "Resisters", "Rejecters"))
+
+# Plot
+ggplot(data = evi_plot, aes(x = Variable, y = Expected, color = Class, group = Class)) +
+  geom_point(shape = 2, size = 2) +
+  geom_line() +
+  labs(x = "Outcome Variables", 
+       y = "Expected Values", 
+       color = "Construct",
+       title = "Expected Values by Latent Class",
+       subtitle = "Comfort level measured on 0-10 scale") +
+  scale_color_manual(values = paletteer::paletteer_d("nbapalettes::knicks_holiday", n = 4))+
+  theme_pubr() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+```
+
+
+# Latent Class Regression
+
+**Note:** The responses were recoded from 0-10 to 1–11 to comply with the requirements of the poLCA package in R Studio but responses have been reported in terms of the survey values.
+
+
+```{r LCR setup and model all, eval=FALSE, include=FALSE}
+library(dplyr)
+
+# Prepare dataframe for poLCA regression
+AiR_lcr <- AiRf %>% dplyr::select(k58a, k58b, k58c, k58d, k58e, D1, k32ax, k32bx, k32cx, k32dx, k48a, k57x, k1, ika, k4, Class, Class_f) 
+
+# Recode outcome variables for poLCA regression
+AiR_lcr$k58a <- as.numeric(as.character(AiR_lcr$k58a))
+AiR_lcr$k58b <- as.numeric(as.character(AiR_lcr$k58b))
+AiR_lcr$k58c <- as.numeric(as.character(AiR_lcr$k58c))
+AiR_lcr$k58d <- as.numeric(as.character(AiR_lcr$k58d))
+AiR_lcr$k58e <- as.numeric(as.character(AiR_lcr$k58e))
+AiR_lcr$k58a1 <- AiR_lcr$k58a + 1
+AiR_lcr$k58b1 <- AiR_lcr$k58b + 1
+AiR_lcr$k58c1 <- AiR_lcr$k58c + 1
+AiR_lcr$k58d1 <- AiR_lcr$k58d + 1
+AiR_lcr$k58e1 <- AiR_lcr$k58e + 1
+
+# Ensure Class is numeric
+AiR_lcr$Class <- as.numeric(AiR_lcr$Class)
+
+# Set Class_f as a factor with "1" as the reference level
+AiR_lcr$Class_f <- relevel(as.factor(AiR_lcr$Class), ref = "1")
+
+# Define the formula for the latent class regression
+f_reg <- cbind(k58a1, k58b1, k58c1, k58d1, k58e1) ~ k1 + ika + k4 + D1 + k48a + k57x
+
+# Perform latent class regression
+set.seed(123)
+LCA_reg <- poLCA(f_reg, data = AiR_lcr, nclass = 4, nrep = 10, verbose = TRUE)
+
+```
+
+```{r LCR setup and model, include=FALSE}
+library(dplyr)
+
+# Prepare dataframe for poLCA regression
+
+AiR_lcr <- AiRf %>% dplyr::select(k58a, k58b, k58c, k58d, k58e, D1, k48a, k57x, k1, ika, k4) 
+
+# Recode outcome variables for poLCA regression
+AiR_lcr$k58a <- as.numeric(as.character(AiR_lcr$k58a))
+AiR_lcr$k58b <- as.numeric(as.character(AiR_lcr$k58b))
+AiR_lcr$k58c <- as.numeric(as.character(AiR_lcr$k58c))
+AiR_lcr$k58d <- as.numeric(as.character(AiR_lcr$k58d))
+AiR_lcr$k58e <- as.numeric(as.character(AiR_lcr$k58e))
+AiR_lcr$k58a1 <- as.factor(AiR_lcr$k58a + 1)
+AiR_lcr$k58b1 <- as.factor(AiR_lcr$k58b + 1)
+AiR_lcr$k58c1 <- as.factor(AiR_lcr$k58c + 1)
+AiR_lcr$k58d1 <- as.factor(AiR_lcr$k58d + 1)
+AiR_lcr$k58e1 <- as.factor(AiR_lcr$k58e + 1)
+
+
+
+# Define the formula for the latent class regression
+f_reg <- cbind(k58a1, k58b1, k58c1, k58d1, k58e1) ~ k1 + ika + k4 + D1 + k48a + k57x
+
+# Perform latent class regression
+set.seed(123)
+LCA_reg <- poLCA(f_reg, data = AiR_lcr, nclass = 4, nrep = 10, verbose = TRUE)
+
+```
+
+```{r LCR retrieve data, include=FALSE}
+# Extract coefficients and SEs
+coeffs <- LCA_reg$coeff
+ses <- LCA_reg$coeff.se
+
+# Calculate t-values and p-values
+t_values <- coeffs / ses
+p_values <- 2 * (1 - pnorm(abs(t_values)))
+
+# Format into a data frame
+lcr_df <- data.frame(
+  Variable = rep(rownames(coeffs), ncol(coeffs)),
+  Class = rep(2:(ncol(coeffs)+1), each = nrow(coeffs)), # Class 1 is reference
+  Coeff = round(as.vector(coeffs),3),
+  Coeff.SE = round(as.vector(ses),3),
+  P_Value = round(as.vector(p_values),3)
+)
+
+# Add significance stars for readability 
+lcr_df$Significance <- cut(lcr_df$P_Value, 
+                           breaks = c(-Inf, 0.001, 0.01, 0.05, 0.1, Inf), 
+                           labels = c("***", "**", "*", ".", " "))
+
+# View the result
+lcr_df$Class <- as.factor(lcr_df$Class)
+
+# Match classes to profiles based on conditional probs
+lcrclass3 <- c(
+  `2` = "Cautious",
+  `3` = "Resisters",
+  `4` = "Rejecters"
+  ) 
+
+lcr_df$Class <- factor(lcr_df$Class, levels = c("2", "4", "3"))
+lcr_df$Class <- set_labels(lcr_df$Class, labels = lcrclass3)
+lcr_df <- lcr_df %>%
+  mutate(
+    lower_ci = Coeff - 1.96 * Coeff.SE,
+    upper_ci = Coeff + 1.96 * Coeff.SE
+  )
+# Calculate confidence interval limits
+lcr_df$lower_ci <- round(lcr_df$lower_ci,3)
+lcr_df$upper_ci <- round(lcr_df$upper_ci,3)
+
+lcrc_plot <- lcr_df %>%
+  filter(Variable != "(Intercept)")
+
+```
+
+```{r LCR coefficient labels, include=FALSE}
+
+lcrvar7 <- c(
+  k1 = "Cautious",
+  ika = "Resisters",
+  k4 = "Rejecters",
+  D1 = "Digital Efficacy",
+  k48a = "Trust parliament",
+  k57x = "Perceive threat",
+  `(Intercept)` = "Intercept"
+  )
+lcr_df$Variable <- set_labels(lcr_df$Variable, labels = lcrvar7)
+
+lcrvar6 <- c(
+  D1 = "Digital Efficacy",
+  ika = "Age",
+  k1 = "Gender",
+  k4 = "Education",
+  k48a = "Trust parliament",
+  k57x = "Perceive threat")
+lcrc_plot$Variable <- set_labels(lcrc_plot$Variable, labels = lcrvar6)
+
+```
+
+
+```{r LCR coefficient table, tab.cap = "Latent class regression coefficients", echo=FALSE}
+
+# Create a summary variable column
+lcr_df$Coeff_all <- paste(lcr_df$Coeff, 
+                                 lcr_df$Significance, 
+                                 " (", 
+                                 lcr_df$Coeff.SE, 
+                                 ")")
+# Create columns of summary variable by class
+lcr_dat <- lcr_df %>% dplyr::select(Class, Variable, Coeff_all)
+lcr_dat_w <- lcr_dat %>% pivot_wider(names_from = Class, 
+              values_from = Coeff_all)
+# Rename classes for consistency
+lcr_dat_w <- lcr_dat_w %>% rename("Class2"= `2`,
+                              "Class3"= `4`,
+                              "Class4"= `3`)
+
+# Add column for indicator names
+Indicator <- c("Constant", "Gender", "Age", "Education level", "Digital efficacy", "Institutional trust", "Perceived threat")
+lcr_tab <- cbind(lcr_dat_w,Indicator)
+# Reorder the table for readability
+lcr_table <- lcr_tab %>% dplyr::select(Indicator, Variable, Class2, Class3, Class4)
+
+# Create report table
+LCR_table <- lcr_table %>%
+  gt() %>%
+  tab_header(
+    title = "Latent Class Regression",
+    subtitle = "Coeffients, significance code, and (Standard Error)"
+  ) %>%
+  cols_label(
+    Class2 = "Class 2",
+    Class3 = "Class 3",
+    Class4 = "Class 4"
+  ) %>% 
+  tab_footnote(footnote = "Note: . p<0.1; *p<0.05; **p<0.01; ***p<0.001")
+
+LCR_table
+
+```
+
+```{r LCR class2, eval=FALSE, tab.cap="Class 2 log-odds coefficients", include=FALSE}
+# Create report table
+lcr_class2 <- lcr_df %>% dplyr::filter(Class==2) %>% dplyr::select(Variable,Coeff,Coeff.SE,P_Value,Significance)
+
+LCR_table2 <- lcr_class2 %>%
+  gt() %>%
+  tab_header(
+    subtitle = "Class 1 to Class 2",
+    title= "Log-odds coefficients"
+  ) %>%
+  cols_label(
+    Variable = "Variable",
+    Coeff = "Coefficient",
+    Coeff.SE = "Standard Error",
+    P_Value = "P-value"
+  ) %>%
+  tab_footnote(footnote = "Note: . p<0.1; *p<0.05; **p<0.01; ***p<0.001")
+
+LCR_table2
+
+```
+
+```{r LCR class3, eval=FALSE, tab.cap="Class 3 log-odds coefficients", include=FALSE}
+# Create report table
+lcr_class3 <- lcr_df %>% dplyr::filter(Class==4) %>% dplyr::select(Variable,Coeff,Coeff.SE,P_Value,Significance)
+
+LCR_table3 <- lcr_class3 %>%
+  gt() %>%
+  tab_header(
+    subtitle = "Class 1 to Class 3",
+    title= "Log-odds coefficients"
+  ) %>%
+  cols_label(
+    Variable = "Variable",
+    Coeff = "Coefficient",
+    Coeff.SE = "Standard Error",
+    P_Value = "P-value"
+  ) %>%
+  tab_footnote(footnote = "Note: . p<0.1; *p<0.05; **p<0.01; ***p<0.001")
+
+LCR_table3
+
+```
+
+```{r LCR class4, eval=FALSE, tab.cap="Class 4 log-odds coefficients", include=FALSE}
+# Create report table
+lcr_class4 <- lcr_df %>% dplyr::filter(Class==3) %>% dplyr::select(Variable,Coeff,Coeff.SE,P_Value,Significance)
+
+LCR_table4 <- lcr_class4 %>%
+  gt() %>%
+  tab_header(
+    subtitle = "Class 1 to Class 4",
+    title= "Log-odds coefficients"
+  ) %>%
+  cols_label(
+    Variable = "Variable",
+    Coeff = "Coefficient",
+    Coeff.SE = "Standard Error",
+    P_Value = "P-value"
+  ) %>%
+  tab_footnote(footnote = "Note: . p<0.1; *p<0.05; **p<0.01; ***p<0.001")
+
+LCR_table4
+
+```
+
+**Note:** Confidence intervals were manually calculated as Coefficient plus or minus 1.96 x Coefficient SE.
+
+```{r LCR coeff plot1, fig.cap = "Plot of latent class regression coefficients", echo=FALSE}
+
+coeff_plot1 <- ggplot(lcr_df, aes(x = Coeff, y = Variable, color = Class)) +
+  geom_point(size = 3) +
+  geom_vline(xintercept = 0, linetype = 2)+
+  geom_errorbar(aes(xmin = lower_ci, xmax = upper_ci), width = 0.2) +
+  labs(title = "Latent Class Regression Coefficients",
+       x = "Coefficient Estimate",
+       y = "Predictor Variables") +
+  theme_pubr() +
+  scale_color_manual(values = paletteer::paletteer_d("nbapalettes::knicks_holiday")[c(2, 3, 4)], 
+                    labels = get_labels(lcr_df$Class)) 
+
+```
+
+```{r LCR coeff plot2, fig.cap = "Plot of latent class regression coefficients (coefficients only)", echo=FALSE}
+
+lcrc_plot$Variable <- as.factor(lcrc_plot$Variable)
+coeff_plot2 <- ggplot(lcrc_plot, aes(y = Coeff, x = Variable, color = Class)) +
+  geom_point(size = 3) +
+  geom_hline(yintercept = 0, linetype = 2)+
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(subtitle = "Predictor coefficients only:",
+       y = "Coefficient Estimate",
+       x = "Predictor Variables") +
+  theme_pubr() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,size = 8))+
+  scale_x_discrete(labels = c(
+    D1 = "D1 (Digital Efficacy)",
+    ika = "ika (Age)",
+    k1 = "k1 (Gender)",
+    k4 = "k4 (Education)",
+    k48a = "k48a (Trust parliament)",
+    k57x = "k57x (Perceive threat)"))+
+  scale_color_manual(values = paletteer::paletteer_d("nbapalettes::knicks_holiday")[c(2, 3, 4)], 
+                    labels = get_labels(lcr_df$Class)) 
+
+
+```
+
+```{r LCR coeff plot group, fig.cap = "Plot of latent class regression coefficients", fig.height=10, fig.width=7, echo=FALSE}
+
+coeff_plots <- wrap_plots(
+  coeff_plot1, coeff_plot2, 
+  ncol = 1
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+coeff_plots + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+
+```{r class 1 predictor plots, include=FALSE}
+
+# k32a plot
+k32a_class1 <- ggplot(Adopters, aes(x = k32ax_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32b plot
+k32b_class1 <- ggplot(Adopters, aes(x = k32bx_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32c plot
+k32c_class1 <- ggplot(Adopters, aes(x = k32cx_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32d plot
+k32d_class1 <- ggplot(Adopters, aes(x = k32dx_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+k48a_class1 <- ggplot(Adopters, aes(x = k48a_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(subtitle = "Adopters", y = "Count") +
+  theme_pubr()
+k57x_class1 <- ggplot(Adopters, aes(x = k57x_f)) +
+  geom_bar(fill="#007A33FF", color="black", alpha = 0.7) +
+  labs(subtitle = "Adopters", y = "Count") +
+  theme_pubr()
+```
+
+```{r class 2 pred plots, include=FALSE}
+
+# k32a plot
+k32a_class2 <- ggplot(Cautious, aes(x = k32ax_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32b plot
+k32b_class2 <- ggplot(Cautious, aes(x = k32bx_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32c plot
+k32c_class2 <- ggplot(Cautious, aes(x = k32cx_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32d plot
+k32d_class2 <- ggplot(Cautious, aes(x = k32dx_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+k48a_class2 <- ggplot(Cautious, aes(x = k48a_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(subtitle = "Cautious", y = "Count") +
+  theme_pubr()
+k57x_class2 <- ggplot(Cautious, aes(x = k57x_f)) +
+  geom_bar(fill="#FE5000FF", color="black", alpha = 0.7) +
+  labs(subtitle = "Cautious", y = "Count") +
+  theme_pubr()
+```
+
+```{r class 3 pred plots, include=FALSE}
+
+# k32a plot
+k32a_class3 <- ggplot(Resisters, aes(x = k32ax_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32b plot
+k32b_class3 <- ggplot(Resisters, aes(x = k32bx_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32c plot
+k32c_class3 <- ggplot(Resisters, aes(x = k32cx_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32d plot
+k32d_class3 <- ggplot(Resisters, aes(x = k32dx_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+k48a_class3 <- ggplot(Resisters, aes(x = k48a_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(subtitle = "Resisters",y = "Count") +
+  theme_pubr()
+k57x_class3 <- ggplot(Resisters, aes(x = k57x_f)) +
+  geom_bar(fill="#0072CEFF", color="black", alpha = 0.7) +
+  labs(subtitle = "Resisters", y = "Count") +
+  theme_pubr()
+```
+
+```{r class 4 pred plots, include=FALSE}
+
+# k32a plot
+k32a_class4 <- ggplot(Rejecters, aes(x = k32ax_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32b plot
+k32b_class4 <- ggplot(Rejecters, aes(x = k32bx_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32c plot
+k32c_class4 <- ggplot(Rejecters, aes(x = k32cx_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+# k32d plot
+k32d_class4 <- ggplot(Rejecters, aes(x = k32dx_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(y = "Count") +
+  theme_pubr()
+k48a_class4 <- ggplot(Rejecters, aes(x = k48a_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(subtitle = "Rejecters", y = "Count") +
+  theme_pubr()
+k57x_class4 <- ggplot(Rejecters, aes(x = k57x_f)) +
+  geom_bar(fill="#8D9093FF", color="black", alpha = 0.7) +
+  labs(subtitle = "Rejecters", y = "Count") +
+  theme_pubr()
+```
+
+```{r class 1 demo plots, include=FALSE}
+
+gender_counts_class1 <- table(Adopters$k1)  
+# convert to percentages
+gender_percentages_class1 <- prop.table(gender_counts_class1) * 100  
+
+# create a data frame 
+gender_df_class1 <- data.frame(
+  Gender = names(gender_counts_class1), 
+  count = as.vector(gender_counts_class1),  
+  percentage = round(gender_percentages_class1, 1)  
+)
+
+gender_df_class1$Gender <- set_labels(gender_df_class1$Gender, labels = gen3lik)
+
+gender_class1 <- ggplot(gender_df_class1, aes(x = Gender, y = count, fill=Gender)) +
+  geom_bar(stat = "identity", alpha = 0.7, color = "black") +
+  coord_flip() + 
+  labs(subtitle = "Adopters",y = "Count") +
+  geom_text(aes(label = paste0(percentage.Freq, "%")), 
+            hjust = - 0.2, 
+            color = "black") +
+  scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +
+  theme_pubr()+
+  theme(legend.position = "none")+
+  scale_y_continuous(limits = c(0, 300))
+
+# plot for the variable "ika"
+age_class1 <- ggplot(Adopters, aes(x = ika, fill=k1_f)) +
+  geom_histogram(binwidth = 5,color="black", alpha = 0.7) +
+  labs(subtitle = "Adopters",y = "Count") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +  
+  theme_pubr() +
+  theme(legend.position = "none")
+
+# plot for the variable k4
+edu_class1 <- ggplot(Adopters, aes(x = k4_f, fill=k1_f)) +
+  geom_bar(color="black", alpha = 0.7) +
+  labs(subtitle = "Adopters",y = "Count") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3), 
+                    labels = get_labels(AiR$k1_f)) + 
+  theme_pubr() +
+  theme(legend.position = "bottom")
+
+```
+
+```{r class 2 demo plots, include=FALSE}
+
+gender_counts_class2 <- table(Cautious$k1)  
+# convert to percentages
+gender_percentages_class2 <- prop.table(gender_counts_class2) * 100  
+
+# create a data frame 
+gender_df_class2 <- data.frame(
+  Gender = names(gender_counts_class2), 
+  count = as.vector(gender_counts_class2),  
+  percentage = round(gender_percentages_class2, 1)  
+)
+
+gender_df_class2$Gender <- set_labels(gender_df_class2$Gender, labels = gen3lik)
+
+gender_class2 <- ggplot(gender_df_class2, aes(x = Gender, y = count, fill=Gender)) +
+  geom_bar(stat = "identity", alpha = 0.7, color = "black") +
+  coord_flip() + 
+  labs(subtitle = "Cautious",y = "Count") +
+  geom_text(aes(label = paste0(percentage.Freq, "%")), 
+            hjust = - 0.2, 
+            color = "black") +
+  scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +
+  theme_pubr()+
+  theme(legend.position = "none")+
+  scale_y_continuous(limits = c(0, 300))
+
+# plot for the variable "ika"
+age_class2 <- ggplot(Cautious, aes(x = ika, fill=k1_f)) +
+  geom_histogram(binwidth = 5,color="black", alpha = 0.7) +
+  labs(subtitle = "Cautious",y = "Count") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +  
+  theme_pubr() +
+  theme(legend.position = "none")
+
+# plot for the variable k4
+edu_class2 <- ggplot(Cautious, aes(x = k4_f, fill=k1_f)) +
+  geom_bar(color="black", alpha = 0.7) +
+  labs(subtitle = "Cautious", y = "Count") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3), 
+                    labels = get_labels(AiR$k1_f)) + 
+  theme_pubr() +
+  theme(legend.position = "bottom")
+
+```
+
+```{r class 3 demo plots, include=FALSE}
+
+gender_counts_class3 <- table(Resisters$k1)  
+# convert to percentages
+gender_percentages_class3 <- prop.table(gender_counts_class3) * 100  
+
+# create a data frame 
+gender_df_class3 <- data.frame(
+  Gender = names(gender_counts_class3), 
+  count = as.vector(gender_counts_class3),  
+  percentage = round(gender_percentages_class3, 1)  
+)
+
+gender_df_class3$Gender <- set_labels(gender_df_class3$Gender, labels = gen3lik)
+
+gender_class3 <- ggplot(gender_df_class3, aes(x = Gender, y = count, fill=Gender)) +
+  geom_bar(stat = "identity", alpha = 0.7, color = "black") +
+  coord_flip() + 
+  labs(subtitle = "Resisters", y = "Count") +
+  geom_text(aes(label = paste0(percentage.Freq, "%")), 
+            hjust = - 0.2, 
+            color = "black") +
+  scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +
+  theme_pubr()+
+  theme(legend.position = "none")+
+  scale_y_continuous(limits = c(0, 300))
+
+# plot for the variable "ika"
+age_class3 <- ggplot(Resisters, aes(x = ika, fill=k1_f)) +
+  geom_histogram(binwidth = 5,color="black", alpha = 0.7) +
+  labs(subtitle = "Resisters", y = "Count") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +  
+  theme_pubr() +
+  theme(legend.position = "none")
+
+# plot for the variable k4
+edu_class3 <- ggplot(Resisters, aes(x = k4_f, fill=k1_f)) +
+  geom_bar(color="black", alpha = 0.7) +
+  labs(subtitle = "Resisters", y = "Count") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3), 
+                    labels = get_labels(AiR$k1_f)) + 
+  theme_pubr() +
+  theme(legend.position = "bottom")
+
+```
+
+```{r class 4 demo plots, include=FALSE}
+
+gender_counts_class4 <- table(Rejecters$k1)  
+# convert to percentages
+gender_percentages_class4 <- prop.table(gender_counts_class4) * 100  
+
+# create a data frame 
+gender_df_class4 <- data.frame(
+  Gender = names(gender_counts_class4), 
+  count = as.vector(gender_counts_class4),  
+  percentage = round(gender_percentages_class4, 1)  
+)
+
+gender_df_class4$Gender <- set_labels(gender_df_class4$Gender, labels = gen3lik)
+
+gender_class4 <- ggplot(gender_df_class4, aes(x = Gender, y = count, fill=Gender)) +
+  geom_bar(stat = "identity", alpha = 0.7, color = "black") +
+  coord_flip() + 
+  labs(subtitle = "Rejecters",y = "Count") +
+  geom_text(aes(label = paste0(percentage.Freq, "%")), 
+            hjust = - 0.2, 
+            color = "black") +
+  scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +
+  theme_pubr()+
+  theme(legend.position = "none")+
+  scale_y_continuous(limits = c(0, 300))
+
+# plot for the variable "ika"
+age_class4 <- ggplot(Rejecters, aes(x = ika, fill=k1_f)) +
+  geom_histogram(binwidth = 5,color="black", alpha = 0.7) +
+  labs(subtitle = "Rejecters", 
+       y = "Count") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3)) +  
+  theme_pubr() +
+  theme(legend.position = "none")
+
+# plot for the variable k4
+edu_class4 <- ggplot(Rejecters, aes(x = k4_f, fill=k1_f)) +
+  geom_bar(color="black", alpha = 0.7) +
+  labs(subtitle = "Rejecters", y = "Count") +
+    scale_fill_manual(values = paletteer::paletteer_d("yarrr::basel", n = 3), 
+                    labels = get_labels(AiR$k1_f)) + 
+  theme_pubr() +
+  theme(legend.position = "bottom")
+
+```
+
+```{r class 1 ika stats, tab.cap="Summary statistics for age variable 'ika'", include=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika_class1 <- Adopters %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+
+ika_table_class1 <- summary_ika_class1 %>%
+  gt() %>%
+  tab_header(
+    title = "Class 1 (Adopters) age summary statistics"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table_class1
+```
+
+```{r class 2 ika stats, tab.cap="Summary statistics for age variable 'ika'",include=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika_class2 <- Cautious %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+
+ika_table_class2 <- summary_ika_class2 %>%
+  gt() %>%
+  tab_header(
+    title = "Class 2 (Cautious) age summary statistics"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table_class2
+```
+
+```{r class 3 ika stats, tab.cap="Summary statistics for age variable 'ika'", include=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika_class3 <- Resisters %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+
+ika_table_class3 <- summary_ika_class3 %>%
+  gt() %>%
+  tab_header(
+    title = "Class 3 (Resisters) age summary statistics"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table_class3
+```
+
+```{r class 4 ika stats, include=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika_class4 <- Rejecters %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+
+ika_table_class4 <- summary_ika_class4 %>%
+  gt() %>%
+  tab_header(
+    title = "Class 4 (Rejecters) age summary statistics"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table_class4
+```
+
+## Digital Efficacy by Latent Class
+
+```{r digeff plots class,  fig.cap = "Digital efficacy factor by latent class", fig.height=6, echo=FALSE}
+
+ggplot(AiRf, aes(x=Class_f, y = D1, fill = Class_f)) +
+  geom_boxplot(color="black", alpha = 0.7) +
+  labs(x="Construct") +
+  theme_pubr()+
+  scale_fill_manual(values = paletteer::paletteer_d("nbapalettes::knicks_holiday", n = 4))+
+  scale_x_discrete(labels = get_labels(AiRf$Class_f))+
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data") +
+  theme(legend.position = "none")
+```
+
+
+## Institutional Trust by Latent Class
+
+```{r inst trust by class plots,  fig.cap = "Age distribution by latent class", fig.height=6, echo=FALSE}
+
+trust_class <- wrap_plots(
+  k48a_class1, k48a_class2, 
+  k48a_class3, k48a_class4,
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+trust_class + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+## Perceived Threat by Latent Class
+
+```{r perc threat by class plots,  fig.cap = "Perceived threat distribution by latent class", fig.height=6, echo=FALSE}
+
+threat_class <- wrap_plots(
+  k57x_class1, k57x_class2, 
+  k57x_class3, k57x_class4,
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+threat_class + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+## Gender by Latent Class
+
+```{r gender by class plots,  fig.cap = "Gender distribution by latent class", fig.height=6, echo=FALSE}
+
+gender_class <- wrap_plots(
+  gender_class1, gender_class2, 
+  gender_class3, gender_class4,
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+gender_class + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+## Age by Latent Class
+
+```{r age by class plots,   fig.cap = "Age distribution by latent class", fig.height=6, echo=FALSE}
+
+age_class <- wrap_plots(
+  age_class1, age_class2, 
+  age_class3, age_class4,
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+age_class + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+## Education level by latent class
+
+```{r edu by class plots,  fig.cap = "Education level distribution by latent class", fig.height=6, echo=FALSE}
+
+edu_class <- wrap_plots(
+  edu_class1, edu_class2, 
+  edu_class3, edu_class4,
+  ncol = 2
+) + 
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+edu_class + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+## Expected Values of predictors
+
+```{r Expected values pred, fig.cap = "Distribution of predictor expected values by latent class", fig.height=6, echo=FALSE}
+# Create dataframes of expected values for each class
+ev_df1 <- data.frame(Class = "Adopters",
+                     Variable = 1:6,
+                     Expected = c(mean(Adopters$k32ax, na.rm = TRUE),
+                                  mean(Adopters$k32bx, na.rm = TRUE),
+                                  mean(Adopters$k32cx, na.rm = TRUE),
+                                  mean(Adopters$k32dx, na.rm = TRUE),
+                                  0.5 * mean(Adopters$k48a, na.rm = TRUE),
+                                  mean(Adopters$k57x, na.rm = TRUE)))
+
+ev_df2 <- data.frame(Class = "Cautious",
+                     Variable = 1:6,
+                     Expected = c(mean(Cautious$k32ax, na.rm = TRUE),
+                                  mean(Cautious$k32bx, na.rm = TRUE),
+                                  mean(Cautious$k32cx, na.rm = TRUE),
+                                  mean(Cautious$k32dx, na.rm = TRUE),
+                                  0.5 * mean(Cautious$k48a, na.rm = TRUE),
+                                  mean(Cautious$k57x, na.rm = TRUE)))
+
+ev_df3 <- data.frame(Class = "Resisters",
+                     Variable = 1:6,
+                     Expected = c(mean(Resisters$k32ax, na.rm = TRUE),
+                                  mean(Resisters$k32bx, na.rm = TRUE),
+                                  mean(Resisters$k32cx, na.rm = TRUE),
+                                  mean(Resisters$k32dx, na.rm = TRUE),
+                                  0.5 * mean(Resisters$k48a, na.rm = TRUE),
+                                  mean(Resisters$k57x, na.rm = TRUE)))
+
+ev_df4 <- data.frame(Class = "Rejecters",
+                     Variable = 1:6,
+                     Expected = c(mean(Rejecters$k32ax, na.rm = TRUE),
+                                  mean(Rejecters$k32bx, na.rm = TRUE),
+                                  mean(Rejecters$k32cx, na.rm = TRUE),
+                                  mean(Rejecters$k32dx, na.rm = TRUE),
+                                  0.5 * mean(Rejecters$k48a, na.rm = TRUE),
+                                  mean(Rejecters$k57x, na.rm = TRUE)))
+
+# Combine all data frames
+ev_plot <- rbind(ev_df1, ev_df2, ev_df3, ev_df4)
+
+# Define predictor variable labels
+pred_vars <- c("D1:Usage", "D1:Search", "D1:Privacy", "D1:Learning", "Inst. Trust*", "AI Threat")
+
+# Convert variables to factor with proper labels
+ev_plot$Variable <- factor(ev_plot$Variable, levels = 1:6, labels = pred_vars)
+ev_plot$Class <- factor(ev_plot$Class, levels = c("Adopters", "Cautious", "Resisters", "Rejecters"))
+
+# Plot
+ggplot(data = ev_plot, aes(x = Variable, y = Expected, colour = Class, group = Class)) +
+  geom_point(shape = 2, size = 2) +
+  geom_line() +
+  labs(x = "Predictor Variables", 
+       y = "Expected Values",
+       color = "Construct",
+       title = "Expected Values by Latent Class",
+       subtitle = "*Institutional trust scaled (0-5) for comparative readability") +
+  scale_color_manual(values = paletteer::paletteer_d("nbapalettes::knicks_holiday", n = 4))+
+  theme_pubr() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+```
+
+
+```{r Expected values alt, eval=FALSE, fig.cap="Distribution of predictor expected values by latent class", fig.height=6, include=FALSE}
+# Create dataframes of expected values for each class
+evx_df1 <- data.frame(Class = "Adopters",
+                     Variable = 1:6,
+                     Expected = c(mean(Adopters$k34ax, na.rm = TRUE),
+                                  mean(Adopters$k34bx, na.rm = TRUE),
+                                  0.5 * mean(Adopters$k46, na.rm = TRUE),
+                                  0.5 * mean(Adopters$k47, na.rm = TRUE),
+                                  0.5 * mean(Adopters$k48b, na.rm = TRUE),
+                                  0.5 * mean(Adopters$k62, na.rm = TRUE)))
+
+evx_df2 <- data.frame(Class = "Cautious",
+                     Variable = 1:6,
+                     Expected = c(mean(Cautious$k34ax, na.rm = TRUE),
+                                  mean(Cautious$k34bx, na.rm = TRUE),
+                                  0.5 * mean(Cautious$k46, na.rm = TRUE),
+                                  0.5 * mean(Cautious$k47, na.rm = TRUE),
+                                  0.5 * mean(Cautious$k48b, na.rm = TRUE),
+                                  0.5 * mean(Cautious$k62, na.rm = TRUE)))
+
+evx_df3 <- data.frame(Class = "Resisters",
+                     Variable = 1:6,
+                     Expected = c(mean(Resisters$k34ax, na.rm = TRUE),
+                                  mean(Resisters$k34bx, na.rm = TRUE),
+                                  0.5 * mean(Resisters$k46, na.rm = TRUE),
+                                  0.5 * mean(Resisters$k47, na.rm = TRUE),
+                                  0.5 * mean(Resisters$k48b, na.rm = TRUE),
+                                  0.5 * mean(Resisters$k62, na.rm = TRUE)))
+
+evx_df4 <- data.frame(Class = "Rejecters",
+                     Variable = 1:6,
+                     Expected = c(mean(Rejecters$k34ax, na.rm = TRUE),
+                                  mean(Rejecters$k34bx, na.rm = TRUE),
+                                  0.5 * mean(Rejecters$k46, na.rm = TRUE),
+                                  0.5 * mean(Rejecters$k47, na.rm = TRUE),
+                                  0.5 * mean(Rejecters$k48b, na.rm = TRUE),
+                                  0.5 * mean(Rejecters$k62, na.rm = TRUE)))
+
+# Combine all data frames
+evx_plot <- rbind(evx_df1, evx_df2, evx_df3, evx_df4)
+
+# Define predictor variable labels
+predx_vars <- c("Prefers meeting online", "Lonely without internet", "Political leaning (Left=0)*", "Trust people in General*", "Trust Finnish courts*", "Self-assesed social level*")
+
+# Convert variables to factor with proper labels
+evx_plot$Variable <- factor(evx_plot$Variable, levels = 1:6, labels = predx_vars)
+evx_plot$Class <- factor(evx_plot$Class, levels = c("Adopters", "Cautious", "Resisters", "Rejecters"))
+
+# Plot
+ggplot(data = evx_plot, aes(x = Variable, y = Expected, colour = Class, group = Class)) +
+  geom_point(shape = 2, size = 2) +
+  geom_line() +
+  labs(x = "Predictor Variables", 
+       y = "Expected Values",
+       color = "Construct",
+       title = "Expected Values by Latent Class",
+       subtitle = "*Scaled (0-5) for comparative readability") +
+  scale_color_manual(values = paletteer::paletteer_d("nbapalettes::knicks_holiday", n = 4))+
+  theme_pubr() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))+
+  plot_annotation(caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+```
+
+# Indicator distributions by latent class
+
+```{r anx class 1 predictor plots,  fig.cap = "Class 1 predictor distributions", fig.height=6, echo=FALSE}
+
+ind_class1 <- wrap_plots(
+  k32a_class1, k32b_class1, 
+  k32c_class1, k32d_class1,
+  k48a_class1, k57x_class1,
+  ncol = 2
+) + 
+  plot_annotation(title = "Class 1 (Adopters)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+ind_class1 + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+```{r anx class 1 demo plots, echo=FALSE,  fig.cap="Class 1 demographic distributions", fig.height=6}
+
+demo_class1 <- wrap_plots(
+  gender_class1, age_class1, 
+  edu_class1,
+  ncol = 1
+) + 
+  plot_annotation(title = "Class 1 (Adopters)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+demo_class1 + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+```
+
+```{r anx class 1 ika stats, tab.cap="Summary statistics for age variable 'ika'", echo=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika_class1 <- Adopters %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+
+ika_table_class1 <- summary_ika_class1 %>%
+  gt() %>%
+  tab_header(
+    title = "Class 1 (Adopters) age summary statistics"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table_class1
+```
+
+```{r anx class 2 predictor plots,  fig.cap = "Class 2 predictor distributions", fig.height=6, echo=FALSE}
+
+ind_class2 <- wrap_plots(
+  k32a_class2, k32b_class2, 
+  k32c_class2, k32d_class2,
+  k48a_class2, k57x_class2,
+  ncol = 2
+) + 
+  plot_annotation(title = "Class 2 (Cautious)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+ind_class2 + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+
+```{r anx class 2 demo plots, echo=FALSE,  fig.cap="Class 2 demographic distributions", fig.height=6}
+
+demo_class2 <- wrap_plots(
+  gender_class2, age_class2, 
+  edu_class2,
+  ncol = 1
+) + 
+  plot_annotation(title = "Class 2 (Cautious)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+demo_class2 + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+```{r anx class 2 ika stats, tab.cap="Summary statistics for age variable 'ika'", echo=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika_class2 <- Cautious %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+
+ika_table_class2 <- summary_ika_class2 %>%
+  gt() %>%
+  tab_header(
+    title = "Class 2 (Cautious) age summary statistics"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table_class2
+```
+
+
+```{r anx class 3 predictor plots,  fig.cap = "Class 3 predictor distributions", fig.height=6, echo=FALSE}
+
+ind_class3 <- wrap_plots(
+  k32a_class3, k32b_class3, 
+  k32c_class3, k32d_class3,
+  k48a_class3, k57x_class3,
+  ncol = 2
+) + 
+  plot_annotation(title = "Class 3 (Resisters)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+ind_class3 + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+
+```{r anx class 3 demo plots,  echo=FALSE, fig.cap="Class 3 demographic distributions",fig.height=6}
+
+
+demo_class3 <- wrap_plots(
+  gender_class3, age_class3, 
+  edu_class3,
+  ncol = 1
+) + 
+  plot_annotation(title = "Class 3 (Resisters)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+demo_class3 + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+```{r anx class 3 ika stats, tab.cap="Summary statistics for age variable 'ika'", echo=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika_class3 <- Resisters %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+
+ika_table_class3 <- summary_ika_class3 %>%
+  gt() %>%
+  tab_header(
+    title = "Class 3 (Resisters) age summary statistics"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table_class3
+```
+
+
+```{r anx class 4 predictor plots, fig.cap = "Class 4 predictor distributions", fig.height=6, echo=FALSE}
+
+ind_class4 <- wrap_plots(
+  k32a_class4, k32b_class4, 
+  k32c_class4, k32d_class4,
+  k48a_class4, k57x_class4,
+  ncol = 2
+) + 
+  plot_annotation(title = "Class 4 (Rejecters)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+ind_class4 + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+
+```{r anx class 4 demo plots,  echo=FALSE, fig.cap="Class 4 demographic distributions",fig.height=6}
+
+demo_class4 <- wrap_plots(
+  gender_class4, age_class4, 
+  edu_class4,
+  ncol = 1
+) + 
+  plot_annotation(title = "Class 4 (Rejecters)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+demo_class4 + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+```{r anx class 4 ika stats, tab.cap="Summary statistics for age variable 'ika'", echo=FALSE}
+library(dplyr)
+
+# Summary statistics for the variable "ika"
+summary_ika_class4 <- Rejecters %>%
+  summarise(
+    mean = mean(ika, na.rm = TRUE),
+    sd = sd(ika, na.rm = TRUE),
+    min = min(ika, na.rm = TRUE),
+    Q1 = quantile(ika, 0.25, na.rm = TRUE),  
+    Q3 = quantile(ika, 0.75, na.rm = TRUE),
+    max = max(ika, na.rm = TRUE),
+    na_count = sum(is.na(ika))
+  )
+
+ika_table_class4 <- summary_ika_class4 %>%
+  gt() %>%
+  tab_header(
+    title = "Class 4 (Rejecters) age summary statistics"
+  ) %>%
+  cols_label(
+    mean = "Mean",
+    sd = "Standard Deviation",
+    min = "Minimum",
+    Q1 = "Quartile 1",
+    Q3 = "Quartile 3",
+    max = "Maximum",
+    na_count = "NA Count"
+  ) %>%
+  fmt_number(
+    columns = c(mean, sd, min, max),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = c(na_count),
+    decimals = 0
+  )
+ika_table_class4
+```
+
+\clearpage
+
+# GLM Regression: Model of Full Sample 
+
+## A1 Models: Comfort with AI Communication
+
+```{r AR1 GLM Regression model 1, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+AR1_glm1 <- glm(A1 ~ D1, data = AiRf, family = gaussian())
+
+# Summary of the GLM
+summary(AR1_glm1)
+```
+
+```{r AR1 GLM Regression model 2, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+AR1_glm2 <- glm(A1 ~ D1 + k48a, data = AiRf, family = gaussian())
+
+# Summary of the GLM
+summary(AR1_glm2)
+```
+
+```{r AR1 GLM Regression model 3, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+AR1_glm3 <- glm(A1 ~ D1 + k48a + k57x, data = AiRf, family = gaussian())
+
+# Summary of the GLM
+summary(AR1_glm3)
+```
+
+```{r AR1 GLM Regression model 4, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+AR1_glm4 <- glm(A1 ~ D1 + k48a + k57x + ika + k1 + k4, data = AiRf, family = gaussian())
+
+# Summary of the GLM
+summary(AR1_glm4)
+```
+
+```{r AR1 Linear model table, eval=FALSE, include=FALSE}
+# Create a summary table for the models
+stargazer(AR1_glm1, AR1_glm2, AR1_glm3, AR1_glm4,
+          type = "latex",
+          title = "Summary of GLM Models",
+          dep.var.labels = "Outcome Variable (A1)",
+          column.labels = c("Model 1", "Model 2", "Model 3", "Model 4"),
+          model.names = FALSE,
+          single.row = TRUE,
+          digits = 3,
+          star.char = c("*", "**", "***"),
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          covariate.labels = c("DL1", "k48a", "k57x", "ika", "k1", "k4"),
+          omit.stat = c("f", "ser"))  
+```
+
+
+```{r A1 Test residuals model 4, echo=FALSE, fig.cap = "Analysis of A1 GLM model (Full Sample)"}
+# Set up the plotting area
+par(mfrow = c(2, 2)) 
+
+plot(AR1_glm4, main= "A1 Model 4")
+```
+
+## A2 Models: Comfort with AI Automation 
+
+```{r AR2 GLM Regression model 1, include=FALSE}
+# GLM with a Gaussian family (AR2 is continuous)
+AR2_glm1 <- glm(A2 ~ D1, data = AiRf, family = gaussian())
+
+# Summary of the GLM
+summary(AR2_glm1)
+```
+
+```{r AR2 GLM Regression model 2, include=FALSE}
+# GLM with a Gaussian family (AR2 is continuous)
+AR2_glm2 <- glm(A2 ~ D1 + k48a, data = AiRf, family = gaussian())
+
+# Summary of the GLM
+summary(AR1_glm2)
+```
+
+```{r AR2 GLM Regression model 3, include=FALSE}
+# GLM with a Gaussian family (AR2 is continuous)
+AR2_glm3 <- glm(A2 ~ D1 + k48a + k57x, data = AiRf, family = gaussian())
+
+# Summary of the GLM
+summary(AR1_glm3)
+```
+
+```{r AR2 GLM Regression model 4, include=FALSE}
+# GLM with a Gaussian family (AR2 is continuous)
+AR2_glm4 <- glm(A2 ~ D1 + k48a + k57x + ika + k1 + k4, data = AiRf, family = gaussian())
+
+# Summary of the GLM
+summary(AR2_glm4)
+```
+
+```{r AR2 Linear model table, eval=FALSE, include=FALSE}
+# Create a summary table for the models
+stargazer(AR2_glm1, AR2_glm2, AR2_glm3, AR2_glm4,
+          type = "latex",
+          title = "Summary of GLM Models",
+          dep.var.labels = "Outcome Variable (AR1)",
+          column.labels = c("Model 1", "Model 2", "Model 3"),
+          model.names = FALSE,
+          single.row = TRUE,
+          digits = 3,
+          star.char = c("*", "**", "***"),
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          covariate.labels = c("DL1", "k48a", "k57x", "ika", "k1", "k4")
+          )  
+```
+
+
+```{r A2 Test residuals model 4, echo=FALSE, fig.cap = "Analysis of A2 GLM model (Full Sample)"}
+# Set up the plotting area
+par(mfrow = c(2, 2)) 
+
+plot(AR2_glm4, main= "A2 Model 4")
+```
+
+
+# GLM Regression: Effect of Excluding Resister Class 
+
+```{r Test sample after excluding Resisters, include=FALSE}
+
+TAMpop <- rbind(Adopters, Cautious, Rejecters)
+
+# AI receptivity (comfort) subset
+EFAAIx <- subset(TAMpop, select= c(k58a,k58b,k58c,k58d,k58e))
+
+EFAAIx <- EFAAIx%>% rename(Medical = k58a,
+                         Driving = k58b, 
+                         Uncertainty = k58c,
+                         Interaction = k58d,
+                         Reliability = k58e)
+```
+
+```{r AI comfort corr resist excluded, echo=FALSE, fig.cap="Correlation of AI comfort indicators (Resister class excluded))"}
+# Calculate the correlation matrix
+AI_matx <- cor(EFAAIx, method = "spearman")
+
+
+# plot the matrix
+corrplot(AI_matx, method = "color", 
+         type = "full",  
+         order = "original", 
+         tl.col = "black",
+         tl.cex = .8,
+         diag = TRUE,
+         addgrid.col = "cadetblue",
+         addrect = 1,
+         number.font = 1,
+         tl.srt = 45,
+         addCoef.col = "black",  
+         number.cex = 1,      
+         title = "AI Correlation matrix (resisters excluded)", 
+         mar=c(0,0,2,0))         
+
+
+```
+
+
+```{r AIR parallel analysis excl resist, echo=FALSE, fig.cap="Parallel analysis test for AI receptivity (Resisters excluded)"}
+
+# Parallel analysis test for number of factors
+fa.parallel(EFAAIx,
+            fa = "fa",
+            main="PA: Resiters Excluded",
+            n.iter = 10,
+            correct=.5, 
+            sqrt=TRUE)
+
+```
+
+```{r EFA excl resist, include=FALSE}
+
+fa_aix <- fa(EFAAIx, 
+              nfactors = 2, 
+              rotate = "Promax",
+              cor = "spearman",
+              fm ="uls", 
+              scores = "regression")
+print(fa_aix)
+```
+
+```{r AI EFA diag excl resist, fig.cap = "AI comfort factor structure (Resisters excluded)", echo=FALSE}
+# Factor loading diagram digital literacy
+colnames(fa_aix$loadings) <- c("B1", "B2")
+fa.diagram(fa_aix, 
+           marg=c(1,1,1,1),
+           main="",
+           l.cex = 0.8,
+           e.size = .1,
+           cut = 0.3)
+
+```
+
+```{r AI Factor loadings variables excl resist, include=FALSE}
+# AI Factor loading variable
+fact_score_aix <- as.data.frame(fa_aix$scores)
+fact_score_aix <- fact_score_aix %>% rename(B1 = ULS1)
+fact_score_aix <- fact_score_aix %>% rename(B2 = ULS2)
+fact_score_aix$B1 <- set_label(fact_score_aix$B1, label = "B1 : Communication")
+fact_score_aix$B2 <- set_label(fact_score_aix$B2, label = "B2 : Automation")
+
+AiRx <- cbind(TAMpop, fact_score_aix)
+
+```
+
+```{r EFA B1 B2 loadings, fig.cap = "AI Comfort factor analysis loadings (Resisters excluded)", echo=FALSE}
+# Extract loadings and communalities
+loadings1_aix <- fa_aix$loadings[, 1]  
+loadings2_aix <- fa_aix$loadings[, 2]  
+communalities_aix <- fa_aix$communality  
+
+# Data frame for the table
+df_aix <- data.frame(
+  Indicator = c("Medical", "Driving", "Uncertainty", "Interaction", "Reliability"),
+  Variable = rownames(fa_ai$loadings),  
+  B1 = loadings1_aix,
+  B2 = loadings2_aix,
+  Communalities = communalities_aix          
+)
+
+# gt table
+ai_tablex <- df_aix %>%
+  gt() %>%
+  tab_header(
+    title = "AI Comfort EFA Results (Resisters Excluded)",
+    subtitle = "Factor Loadings and Communalities"
+  ) %>%
+  cols_label(
+    Indicator = "Comfort Measure",
+    Variable = "Variable",
+    B1 = "B1",
+    B2 = "B2",
+    Communalities = "h² Communalities"
+  ) %>%
+  fmt_number(
+    columns = c(B1, B2, Communalities),
+    decimals = 3  
+  )
+ai_tablex
+
+```
+
+## B1 Models: Comfort with AI Communication 
+
+```{r B1 GLM Regression model 1, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+B1_glm1 <- glm(B1 ~ D1, data = AiRx, family = gaussian())
+
+# Summary of the GLM
+summary(B1_glm1)
+```
+
+```{r B1 GLM Regression model 2, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+B1_glm2 <- glm(B1 ~ D1 + k48a, data = AiRx, family = gaussian())
+
+# Summary of the GLM
+summary(B1_glm2)
+```
+
+```{r B1 GLM Regression model 3, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+B1_glm3 <- glm(B1 ~ D1 + k48a + k57x, data = AiRx, family = gaussian())
+
+# Summary of the GLM
+summary(B1_glm3)
+```
+
+```{r B1 GLM Regression model 4, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+B1_glm4 <- glm(B1 ~ D1 + k48a + k57x + ika + k1 + k4, data = AiRx, family = gaussian())
+
+# Summary of the GLM
+summary(B1_glm4)
+```
+
+```{r B1 Linear model table, include=FALSE}
+# Create a summary table for the models
+stargazer(B1_glm1, B1_glm2, B1_glm3, B1_glm4,
+          type = "latex",
+          title = "Summary of B1 GLM Models (Resisters Excluded)",
+          dep.var.labels = "Outcome Variable (B1)",
+          column.labels = c("Model 1", "Model 2", "Model 3", "Model 4"),
+          model.names = FALSE,
+          single.row = TRUE,
+          digits = 3,
+          star.char = c("*", "**", "***"),
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          covariate.labels = c("D1", "k48a", "k57x", "ika", "k1", "k4"),
+          omit.stat = c("f", "ser"))  
+```
+
+
+```{r B1 Test residuals model 4, echo=FALSE, fig.cap = "Analysis of B1 GLM model (Resisters excluded)"}
+# Set up the plotting area
+par(mfrow = c(2, 2)) 
+
+plot(B1_glm4, main= "Model 4 (B1)")
+```
+
+## B2 Models: Comfort with AI Automation 
+
+```{r B2 GLM Regression model 1, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+B2_glm1 <- glm(B2 ~ D1, data = AiRx, family = gaussian())
+
+# Summary of the GLM
+summary(B2_glm1)
+```
+
+```{r B2 GLM Regression model 2, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+B2_glm2 <- glm(B2 ~ D1 + k48a, data = AiRx, family = gaussian())
+
+# Summary of the GLM
+summary(B2_glm2)
+```
+
+```{r B2 GLM Regression model 3, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+B2_glm3 <- glm(B2 ~ D1 + k48a + k57x, data = AiRx, family = gaussian())
+
+# Summary of the GLM
+summary(B2_glm3)
+```
+
+```{r B2 GLM Regression model 4, include=FALSE}
+# GLM with a Gaussian family (AR1 is continuous)
+B2_glm4 <- glm(B2 ~ D1 + k48a + k57x + ika + k1 + k4, data = AiRx, family = gaussian())
+
+# Summary of the GLM
+summary(B2_glm4)
+```
+
+```{r B2 Linear model table, include=FALSE}
+# Create a summary table for the models
+stargazer(B2_glm1, B2_glm2, B2_glm3, B2_glm4,
+          type = "latex",
+          title = "Summary of GLM Models (Resisters Excluded)",
+          dep.var.labels = "Outcome Variable (B2)",
+          column.labels = c("Model 1", "Model 2", "Model 3", "Model 4"),
+          model.names = FALSE,
+          single.row = TRUE,
+          digits = 3,
+          star.char = c("*", "**", "***"),
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          covariate.labels = c("D1", "k48a", "k57x", "ika", "k1", "k4"),
+          omit.stat = c("f", "ser"))  
+```
+
+
+```{r B2 Test residuals model 4, echo=FALSE, fig.cap = "Analysis of B2 GLM model (Resisters excluded)"}
+# Set up the plotting area
+par(mfrow = c(2, 2)) 
+
+plot(B2_glm4, main= "Model 4 (B2)")
+```
+
+
+
+```{r B1 predictor plots ecl resist, include=FALSE}
+
+A1D1plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =D1, y = B1)) +
+  geom_point() +
+  #geom_boxplot(fill="steelblue3", alpha=0.6, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "D1: Digital Efficacy") +
+  geom_smooth(method = "lm") +
+  theme_pubr()
+
+A1k48plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =k48a_f, y = B1)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "Institutional Trust") +
+  theme_pubr()
+
+A1k57plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =k57x_f, y = B1)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "Personal Threat") +
+  theme_pubr()
+
+A1ikaplot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =ika, y = B1)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+    geom_smooth(method = "lm") +
+  labs(x = "Age") +
+  theme_pubr()
+
+A1k1plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =k1_f, y = B1)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "Gender") +
+  theme_pubr()
+
+A1k4plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =k4_f, y = B1)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "Education Level") +
+  theme_pubr()
+
+```
+
+```{r B2 predictor plots excl resist, echo=FALSE}
+
+A2D1plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =D1, y = B2)) +
+  geom_point() +
+  #geom_boxplot(fill="steelblue3", alpha=0.6, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "D1: Digital Efficacy") +
+  geom_smooth(method = "lm") +
+  theme_pubr()
+
+A2k48plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =k48a_f, y = B2)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "Institutional Trust") +
+  theme_pubr()
+
+A2k57plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =k57x_f, y = B2)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "Personal Threat") +
+  theme_pubr()
+
+A2ikaplot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =ika, y = B2)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+    geom_smooth(method = "lm") +
+  labs(x = "Age") +
+  theme_pubr()
+
+A2k1plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =k1_f, y = B2)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "Gender") +
+  theme_pubr()
+
+A2k4plot <- ggplot(
+  data = AiRx,
+  mapping = aes(x =k4_f, y = B2)) +
+  geom_point(color="steelblue4", alpha=0.5) +
+  geom_boxplot(fill="steelblue3", alpha=0.8, varwidth=TRUE, staplewidth = 0.2, coef=1.5) +
+  labs(x = "Education Level") +
+  theme_pubr()
+
+```
+
+```{r B1 plots ecl resist, echo=FALSE, fig.cap="B1: AI Comfort (Communication) predictor distributions", fig.height=6, message=FALSE}
+
+a1_preds <- wrap_plots(
+  A1D1plot, A1k48plot, 
+  A1k57plot, A1ikaplot,
+  A1k1plot, A1k4plot,
+  ncol = 2
+) + 
+  plot_annotation(title = "Comfort with AI (Communication Factor)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+a1_preds + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+```
+
+```{r B2 plots ecl resist, echo=FALSE, fig.cap="B2: AI Comfort (Automation) predictor distributions", fig.height=6, message=FALSE}
+
+a2_preds <- wrap_plots(
+  A2D1plot, A2k48plot, 
+  A2k57plot, A2ikaplot,
+  A2k1plot, A2k4plot,
+  ncol = 2
+) + 
+  plot_annotation(title = "Comfort with AI (Automation Factor)", 
+                  caption = "Data from FSD3994 ISSP 2024: Digital Societies: Finnish Data")
+
+a2_preds + 
+  theme(plot.margin = margin(10, 10, 10, 10))
+
+```
+
